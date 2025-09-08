@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Dự đoán Ung thư (Random Forest)</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <div class="wrap">
+    <header class="header">
+      <div class="title">Dự đoán Ung thư <span class="sub">Random Forest</span></div>
+      <div class="desc">Nhập các thông số (numeric). Form sẽ giữ giá trị sau khi dự đoán. Trường bị bỏ trống/không hợp lệ sẽ được highlight.</div>
+    </header>
+    <main class="card">
+      {% if message %}
+        <div class="global-msg">{{ message }}</div>
+      {% endif %}
+      <form id="predict-form" method="post" class="form-grid" novalidate>
+        {% for feature in features %}
+        {% set is_empty = feature in empty_fields %}
+        {% set is_invalid = feature in invalid_fields %}
+        <div class="field {% if is_empty %}error{% endif %} {% if is_invalid %}error{% endif %}">
+          <label for="{{ feature }}">{{ feature }}</label>
+          <input name="{{ feature }}" id="{{ feature }}" type="text" inputmode="decimal" pattern="[-+]?[0-9]*[.,]?[0-9]+" value="{{ input_values.get(feature, '') }}" placeholder="Nhập {{ feature }}" />
+          {% if is_empty %}<div class="error-msg">Ô này còn trống</div>{% endif %}
+          {% if is_invalid %}<div class="error-msg">Giá trị không hợp lệ (phải là số)</div>{% endif %}
+        </div>
+        {% endfor %}
+        <div class="full">
+          <button class="btn" type="submit">Dự đoán</button>
+        </div>
+      </form>
+      {% if result %}
+      <div class="result-box {% if 'Ung thư' in result %}bad{% else %}good{% endif %}">
+        <div class="result-text">{{ result }}</div>
+        {% if proba is not none %}
+        <div class="proba">Xác suất ác tính: {{ (proba*100)|round(2) }}%</div>
+        {% endif %}
+        <div class="meta">Model metrics: Accuracy={{ meta.metrics.accuracy }}, {% if meta.metrics.roc_auc %}ROC-AUC={{ meta.metrics.roc_auc }}{% endif %}</div>
+      </div>
+      {% endif %}
+    </main>
+    <footer class="footer">Bạn có thể chỉnh file <code>model.py</code> để thay đổi thiết lập huấn luyện.</footer>
+  </div>
+
+<script>
+// client-side validation to prevent empty/non-numeric submission
+document.getElementById("predict-form").addEventListener("submit", function(e){
+  const features = Array.from(document.querySelectorAll(".field input"));
+  let empty = [], invalid = [];
+  features.forEach(input => {
+    const name = input.name;
+    const val = input.value.trim();
+    input.classList.remove("input-error");
+    // check empty
+    if(val === "") {
+      empty.push(name);
+      input.classList.add("input-error");
+    } else {
+      // normalize comma decimal to dot
+      const norm = val.replace(",", ".");
+      // check numeric
+      if(!isFinite(norm) || norm === "" ) {
+        invalid.push(name);
+        input.classList.add("input-error");
+      }
+    }
+  });
+  if(empty.length > 0 || invalid.length > 0) {
+    e.preventDefault();
+    // show a brief message at top
+    let msg = "";
+    if(empty.length > 0) msg += "Vui lòng điền đầy đủ các ô. Ô trống: " + empty.join(", ") + ". ";
+    if(invalid.length > 0) msg += "Các ô không hợp lệ (phải là số): " + invalid.join(", ") + ".";
+    // insert or update global msg
+    let gm = document.querySelector(".global-msg");
+    if(!gm) {
+      gm = document.createElement("div");
+      gm.className = "global-msg";
+      const card = document.querySelector(".card");
+      card.insertBefore(gm, card.firstChild.nextSibling);
+    }
+    gm.textContent = msg;
+    gm.scrollIntoView({behavior: "smooth"});
+  }
+});
+</script>
+</body>
+</html>
